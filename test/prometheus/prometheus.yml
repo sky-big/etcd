@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'etcd-1'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['172.17.0.2:12379']
+  - job_name: 'etcd-2'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['172.17.0.3:22379']
+  - job_name: 'etcd-3'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['172.17.0.4:32379']
