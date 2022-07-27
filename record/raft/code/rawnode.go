@@ -17,8 +17,8 @@ package raft
 import (
 	"errors"
 
-	pb "go.etcd.io/etcd/raft/v3/raftpb"
-	"go.etcd.io/etcd/raft/v3/tracker"
+	pb "github.com/sky-big/etcd/record/raft/code/raftpb"
+	"github.com/sky-big/etcd/record/raft/code/tracker"
 )
 
 // ErrStepLocalMsg is returned when try to step a local raft message
@@ -31,6 +31,7 @@ var ErrStepPeerNotFound = errors.New("raft: cannot step as peer not found")
 // RawNode is a thread-unsafe Node.
 // The methods of this struct correspond to the methods of Node and are described
 // more fully there.
+// 非线程安全的 Node，直接调用 raft 的方法，用于实现 multi-raft
 type RawNode struct {
 	raft       *raft
 	prevSoftSt *SoftState

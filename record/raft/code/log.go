@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"log"
 
-	pb "go.etcd.io/etcd/raft/v3/raftpb"
+	pb "github.com/sky-big/etcd/record/raft/code/raftpb"
 )
 
 type raftLog struct {
@@ -62,17 +62,23 @@ func newLogWithSize(storage Storage, logger Logger, maxNextEntsSize uint64) *raf
 		logger:          logger,
 		maxNextEntsSize: maxNextEntsSize,
 	}
+	// 从持久化存储中获得第一个 Index
 	firstIndex, err := storage.FirstIndex()
 	if err != nil {
 		panic(err) // TODO(bdarnell)
 	}
+	// 从持久化存储中获得最后一个 Index
 	lastIndex, err := storage.LastIndex()
 	if err != nil {
 		panic(err) // TODO(bdarnell)
 	}
+
+	// 初始化不稳定存储的第一个 Index
 	log.unstable.offset = lastIndex + 1
 	log.unstable.logger = logger
+
 	// Initialize our committed and applied pointers to the time of the last compaction.
+	// 初始化当前节点的已经提交的 Index 以及已经应用到存储的 Index
 	log.committed = firstIndex - 1
 	log.applied = firstIndex - 1
 
@@ -85,6 +91,11 @@ func (l *raftLog) String() string {
 
 // maybeAppend returns (0, false) if the entries cannot be appended. Otherwise,
 // it returns (last index of new entries, true).
+// 尝试将 Entry 日志添加到 raftLog 中
+// index : 该参数为需要复制消息的前一个 Index
+// logTerm : 发送消息里面 Leader 节点的 Term
+// committed : 发送消息里面 Leader 节点已经 commit 的 Index
+// ents : 发送消息里面需要复制的 Entry 日志列表
 func (l *raftLog) maybeAppend(index, logTerm, committed uint64, ents ...pb.Entry) (lastnewi uint64, ok bool) {
 	if l.matchTerm(index, logTerm) {
 		lastnewi = index + uint64(len(ents))
@@ -313,6 +324,7 @@ func (l *raftLog) allEntries() []pb.Entry {
 // later term is more up-to-date. If the logs end with the same term, then
 // whichever log has the larger lastIndex is more up-to-date. If the logs are
 // the same, the given log is up-to-date.
+// 判断传入的 Term 以及 Index 比自己的新，用来判断是否可以给其它节点发起投票
 func (l *raftLog) isUpToDate(lasti, term uint64) bool {
 	return term > l.lastTerm() || (term == l.lastTerm() && lasti >= l.lastIndex())
 }
