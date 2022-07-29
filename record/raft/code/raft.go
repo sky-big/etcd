@@ -1450,7 +1450,9 @@ func stepCandidate(r *raft, m pb.Message) error {
 		r.handleAppendEntries(m)
 	// 处理接收到 Leader 发送过来的 MsgHeartbeat 心跳消息
 	case pb.MsgHeartbeat:
+		// 自己立刻从候选者转换为 Follower
 		r.becomeFollower(m.Term, m.From) // always m.Term == r.Term
+		// 处理心跳消息
 		r.handleHeartbeat(m)
 	// 处理 Leader 发送过来的 MsgSnap 复制快照的消息
 	case pb.MsgSnap:
