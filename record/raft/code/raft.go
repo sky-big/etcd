@@ -883,12 +883,15 @@ func (r *raft) poll(id uint64, t pb.MessageType, v bool) (granted int, rejected 
 	return r.prs.TallyVotes()
 }
 
-// 处理所有的 Message 消息
+// Raft 状态机处理所有的 Message 消息逻辑
 func (r *raft) Step(m pb.Message) error {
 	// Handle the message term, which may result in our stepping down to a follower.
 	switch {
+	// Term 为 0 表示都是本 Node 发送的本地消息
+	// 例如 Follower 心跳超时后向自己发送 MshHub 消息进行选主逻辑
 	case m.Term == 0:
 		// local message
+	// 接收到的消息中 Term 比自己的 Term 大，如果不是预投票的消息，则自己 Node 主动成为 Follower 身份
 	case m.Term > r.Term:
 		if m.Type == pb.MsgVote || m.Type == pb.MsgPreVote {
 			force := bytes.Equal(m.Context, []byte(campaignTransfer))
@@ -946,6 +949,7 @@ func (r *raft) Step(m pb.Message) error {
 			// fresh election. This can be prevented with Pre-Vote phase.
 			r.send(pb.Message{To: m.From, Type: pb.MsgAppResp})
 		} else if m.Type == pb.MsgPreVote {
+			// 接收到其他节点发送过来预投票的消息，但是消息里面的 Term 比自己的还小，因此立刻发送消息直接拒绝掉
 			// Before Pre-Vote enable, there may have candidate with higher term,
 			// but less log. After update to Pre-Vote, the cluster may deadlock if
 			// we drop messages with a lower term.
@@ -1546,7 +1550,7 @@ func (r *raft) handleAppendEntries(m pb.Message) {
 	// 尝试将消息添加到 raftLog 里面
 	if mlastIndex, ok := r.raftLog.maybeAppend(m.Index, m.LogTerm, m.Commit, m.Entries...); ok {
 		r.send(pb.Message{To: m.From, Type: pb.MsgAppResp, Index: mlastIndex})
-	// 这些 Entry 日志没有添加进去
+		// 这些 Entry 日志没有添加进去
 	} else {
 		r.logger.Debugf("%x [logterm: %d, index: %d] rejected MsgApp [logterm: %d, index: %d] from %x",
 			r.id, r.raftLog.zeroTermOnErrCompacted(r.raftLog.term(m.Index)), m.Index, m.LogTerm, m.Index, m.From)

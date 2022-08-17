@@ -277,24 +277,24 @@ type msgWithResult struct {
 // 该 Node 是上层应用 etcd server 使用的
 type node struct {
 	// 接收 client 发送过来的消息 MsgProp，将该消息下发到下层的 raft 状态机
-	propc      chan msgWithResult
+	propc chan msgWithResult
 	// 接收非 MsgProp 的消息，将这些消息下发到下层的 raft 状态机
-	recvc      chan pb.Message
+	recvc chan pb.Message
 	// 接收应用发来的 ConfChange
-	confc      chan pb.ConfChangeV2
+	confc chan pb.ConfChangeV2
 	// 向应用返回 ConfState
 	confstatec chan pb.ConfState
 	// 向应用返回Ready结构体的chan
-	readyc     chan Ready
+	readyc chan Ready
 	// 接收应用发来的 advance 空消息，是应用通知 raft 状态机上一个 Ready 数据已经处理完成
-	advancec   chan struct{}
+	advancec chan struct{}
 	// 接收应用的心跳空消息
-	tickc      chan struct{}
+	tickc chan struct{}
 	// 通知 raft 状态机停止完成
-	done       chan struct{}
+	done chan struct{}
 	// 通知底层的 raft 状态机停机
-	stop       chan struct{}
-	status     chan chan Status
+	stop   chan struct{}
+	status chan chan Status
 
 	rn *RawNode
 }

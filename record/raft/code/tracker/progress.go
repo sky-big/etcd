@@ -28,6 +28,8 @@ import (
 // strewn around `*raft.raft`. Additionally, some fields are only used when in a
 // certain State. All of this isn't ideal.
 type Progress struct {
+	// Match: 保存目前为止，已复制给该 follower 的日志的最高索引值。如果 leader 对该 follower 上的日志情况一无所知的话，这个值被设为 0
+	// Next：保存下一次 leader 发送 append 消息给该 follower 的日志索引，即下一次复制日志时，leader会从 Next 开始发送日志
 	Match, Next uint64
 	// State defines how the leader should interact with the follower.
 	//
@@ -40,6 +42,19 @@ type Progress struct {
 	//
 	// When in StateSnapshot, leader should have sent out snapshot
 	// before and stops sending any replication message.
+	// ProgressStateProbe: 探测状态，当 follower 拒绝了最近的 append 消息时，那么就会进入探测状态，
+	//   此时 leader 会试图继续往前追溯该 follower 的日志从哪里开始丢失的。
+	//   在 probe 状态时，leader 每次最多 append 一条日志，如果收到的回应中带有 RejectHint 信息，
+	//   则回退 Next 索引，以便下次重试。在初始时，leader 会把所有 follower 的状态设为 probe，
+	//   因为它并不知道各个 follower 的同步状态，所以需要慢慢试探
+	// ProgressStateReplicate: 当 leader 确认某个 follower 的同步状态后，
+	//   它就会把这个 follower 的 state 切换到这个状态，并且用 pipeline 的方式快速复制日志。
+	//   leader 在发送复制消息之后，就修改该节点的 Next 索引为发送消息的最大索引 +1
+	// ProgressStateSnapshot: 接收快照状态。当 leader 向某个 follower 发送 append 消息，
+	//   试图让该 follower 状态跟上 leader 时，发现此时 leader 上保存的索引数据已经对不上了，
+	//   比如 leader 在 index 为 10 之前的数据都已经写入快照中了，但是该 follower 需要的是 10 之前的数据，
+	//   此时就会切换到该状态下，发送快照给该 follower。当快照数据同步追上之后，并不是直接切换到 Replicate 状态，
+	//   而是首先切换到Probe状态
 	State StateType
 
 	// PendingSnapshot is used in StateSnapshot.
@@ -73,6 +88,8 @@ type Progress struct {
 	// When a leader receives a reply, the previous inflights should
 	// be freed by calling inflights.FreeLE with the index of the last
 	// received entry.
+	// 用来做流量控制，因为如果同步请求非常多，再碰上网络分区时，leader 可能会累积很多待发送消息，
+	// 一旦网络恢复，可能会有非常大流量发送给 follower，所以这里要做 flow control。它的实现有点类似 TCP 的滑动窗口
 	Inflights *Inflights
 
 	// IsLearner is true if this progress is tracked for a learner.
